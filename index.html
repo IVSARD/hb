@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Для тебя ♥</title>
+<meta property="og:title" content="Для тебя ♥">
+<meta property="og:description" content="Открой меня">
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; }
+  #hint {
+    position: fixed; left: 0; right: 0; bottom: max(24px, env(safe-area-inset-bottom));
+    text-align: center; font: 500 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: rgba(255, 170, 200, 0); letter-spacing: 0.08em;
+    transition: color 1.5s ease; pointer-events: none;
+  }
+  #hint.show { color: rgba(255, 170, 200, 0.7); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">коснись сердца ♡</div>
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const hint = document.getElementById("hint");
+
+  const PHRASE = "I LOVE YOU";
+  const RAIN_WORDS = ["I LOVE YOU", "EVOLI", "UOY", "LOVE"];
+  // «Консоль» в центре сердца: команда, загрузка, поздравление
+  const CMD = "> birthday.exe";
+  const BAR_CELLS = 10;
+  const WISH = "С ДНЁМ РОЖДЕНИЯ";
+
+  let W = 0, H = 0, DPR = 1;
+  let columns = [];
+  let words = [];
+  let sparks = [];
+  let heartSize = 0, cx = 0, cy = 0;
+  let start = performance.now();
+
+  // Точка на контуре сердца: t от 0 до 2π, результат примерно в [-1, 1]
+  function heartPoint(t) {
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    return { x: x / 17, y: -y / 17 };
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    heartSize = Math.min(W, H) * 0.42;
+    cx = W / 2;
+    cy = H / 2 + heartSize * 0.05;
+
+    // Дождь из букв
+    const colW = Math.max(14, Math.round(W / 34));
+    columns = [];
+    for (let i = 0; i < Math.ceil(W / colW); i++) {
+      columns.push({
+        x: i * colW + colW / 2,
+        y: Math.random() * -H,
+        speed: 0.6 + Math.random() * 1.4,
+        word: RAIN_WORDS[Math.floor(Math.random() * RAIN_WORDS.length)],
+        idx: 0,
+        size: colW * 0.8,
+        acc: 0,
+      });
+    }
+
+    // Надписи, из которых собирается сердце: три слоя — контур и два внутренних
+    words = [];
+    const layers = [
+      { scale: 1.0, count: 46, font: 1.0 },
+      { scale: 0.74, count: 32, font: 0.85 },
+      { scale: 0.5, count: 20, font: 0.72 },
+    ];
+    const baseFont = Math.max(9, heartSize * 0.07);
+    for (const layer of layers) {
+      for (let k = 0; k < layer.count; k++) {
+        const t = (k / layer.count) * Math.PI * 2;
+        const p = heartPoint(t);
+        words.push({
+          tx: p.x * heartSize * layer.scale,
+          ty: p.y * heartSize * layer.scale,
+          x: (Math.random() - 0.5) * W * 1.4,
+          y: -H * (0.6 + Math.random() * 0.9),
+          delay: Math.random() * 1.8 + (1 - layer.scale) * 1.2,
+          font: baseFont * layer.font,
+          alpha: 0,
+        });
+      }
+    }
+  }
+
+  function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+  function drawRain(dt) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const col of columns) {
+      col.acc += col.speed * dt * 0.06;
+      while (col.acc >= 1) {
+        col.acc -= 1;
+        col.y += col.size;
+        col.idx = (col.idx + 1) % col.word.length;
+        if (col.y > H + col.size * 2) {
+          col.y = -Math.random() * H * 0.5;
+          col.word = RAIN_WORDS[Math.floor(Math.random() * RAIN_WORDS.length)];
+          col.speed = 0.6 + Math.random() * 1.4;
+        }
+      }
+      const ch = col.word[col.idx];
+      if (ch === " ") continue;
+      ctx.font = `bold ${col.size}px "Courier New", monospace`;
+      ctx.fillStyle = "rgba(255, 40, 80, 0.9)";
+      ctx.fillText(ch, col.x, col.y);
+    }
+  }
+
+  function drawHeart(now) {
+    const time = (now - start) / 1000;
+    // Сердце бьётся после сборки: двойной удар раз в ~1,2 с
+    const beatT = (time % 1.2) / 1.2;
+    const beat = time > 4
+      ? 1 + 0.06 * Math.exp(-40 * Math.pow(beatT - 0.1, 2)) + 0.04 * Math.exp(-40 * Math.pow(beatT - 0.32, 2))
+      : 1;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(beat, beat);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.shadowColor = "rgba(255, 60, 120, 0.9)";
+    ctx.shadowBlur = 12;
+
+    let assembled = 0;
+    for (const w of words) {
+      const local = Math.max(0, Math.min(1, (time - w.delay) / 2.2));
+      const e = easeOutCubic(local);
+      const x = w.x + (w.tx - w.x) * e;
+      const y = w.y + (w.ty - w.y) * e;
+      if (local >= 1) assembled++;
+      w.alpha = Math.min(1, local * 1.5);
+      ctx.font = `bold ${w.font}px "Courier New", monospace`;
+      ctx.fillStyle = `rgba(255, 120, 170, ${w.alpha})`;
+      ctx.fillText(PHRASE, x, y);
+    }
+    ctx.restore();
+
+    // «Консоль» в центре — когда сердце собрано
+    const ready = assembled / words.length;
+    const t0 = 4.2;
+    if (ready > 0.9 && time > t0) {
+      const tt = time - t0;
+      const f = Math.max(12, heartSize * 0.075);          // строка команды и загрузки
+      const fw = Math.max(18, heartSize * 0.125);         // поздравление
+      ctx.save();
+      ctx.translate(cx, cy - heartSize * 0.12);
+      ctx.scale(beat, beat);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(255, 90, 150, 1)";
+      ctx.shadowBlur = 16;
+      const cursorOn = Math.floor(time * 2.2) % 2 === 0;
+
+      // 1. Команда печатается по буквам за 1,1 с
+      const cmdN = Math.min(CMD.length, Math.floor(tt / 1.1 * CMD.length));
+      ctx.font = `bold ${f}px "Courier New", monospace`;
+      const cmdW = ctx.measureText(CMD).width;
+      ctx.fillStyle = "rgba(255, 200, 220, 0.95)";
+      ctx.fillText(CMD.slice(0, cmdN), -cmdW / 2, -f * 1.6);
+
+      // 2. Загрузка заполняется за 1,4 с
+      const barT = Math.max(0, Math.min(1, (tt - 1.3) / 1.4));
+      if (tt > 1.3) {
+        const filled = Math.round(barT * BAR_CELLS);
+        const bar = "[" + "■".repeat(filled) + "·".repeat(BAR_CELLS - filled) + "] "
+          + String(Math.round(barT * 100)).padStart(3, " ") + "%";
+        const barW = ctx.measureText(bar).width;
+        ctx.fillStyle = "rgba(255, 130, 175, 0.95)";
+        ctx.fillText(bar, -barW / 2, 0);
+      }
+
+      // 3. Поздравление печатается крупно за 1,2 с, в конце мигает курсор
+      if (tt > 2.9) {
+        const wishN = Math.min(WISH.length, Math.floor((tt - 2.9) / 1.2 * WISH.length));
+        ctx.font = `bold ${fw}px "Courier New", monospace`;
+        const wishW = ctx.measureText(WISH).width;
+        ctx.shadowBlur = 26;
+        ctx.fillStyle = "rgba(255, 240, 248, 1)";
+        const shown = WISH.slice(0, wishN);
+        ctx.fillText(shown, -wishW / 2, f * 1.9);
+        if (cursorOn) {
+          const x = -wishW / 2 + ctx.measureText(shown).width + fw * 0.08;
+          ctx.fillRect(x, f * 1.9 - fw * 0.42, fw * 0.5, fw * 0.84);
+        }
+        if (wishN === WISH.length) hint.classList.add("show");
+      } else if (cursorOn) {
+        // Пока поздравления нет, курсор мигает после команды
+        ctx.fillStyle = "rgba(255, 200, 220, 0.95)";
+        const x = -cmdW / 2 + ctx.measureText(CMD.slice(0, cmdN)).width + f * 0.1;
+        ctx.fillRect(x, -f * 1.6 - f * 0.42, f * 0.5, f * 0.84);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Касание — россыпь маленьких сердечек
+  function burst(x, y) {
+    for (let i = 0; i < 28; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 4;
+      sparks.push({
+        x, y,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp - 2,
+        life: 1,
+        size: 10 + Math.random() * 16,
+      });
+    }
+  }
+
+  function drawSparks(dt) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const s of sparks) {
+      s.x += s.vx * dt * 0.06;
+      s.y += s.vy * dt * 0.06;
+      s.vy += 0.08 * dt * 0.06;
+      s.life -= 0.012 * dt * 0.06;
+      ctx.font = `${s.size}px sans-serif`;
+      ctx.fillStyle = `rgba(255, 90, 140, ${Math.max(0, s.life)})`;
+      ctx.fillText("♥", s.x, s.y);
+    }
+    sparks = sparks.filter((s) => s.life > 0);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    // Шлейф: полупрозрачная заливка вместо очистки
+    ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+    ctx.fillRect(0, 0, W, H);
+    drawRain(dt);
+    drawHeart(now);
+    drawSparks(dt);
+    requestAnimationFrame(frame);
+  }
+
+  // На телефоне адресная строка то прячется, то появляется и меняет высоту
+  // окна: пересобирать всё только при повороте или заметной смене размера
+  window.addEventListener("resize", () => {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (Math.abs(w - W) > 40 || Math.abs(h - H) > H * 0.25) resize();
+    else {
+      W = w; H = h;
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+  });
+  window.addEventListener("pointerdown", (e) => burst(e.clientX, e.clientY));
+
+  resize();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, W, H);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
