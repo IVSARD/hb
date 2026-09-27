@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Для тебя ♥</title>
+<meta property="og:title" content="Для тебя ♥">
+<meta property="og:description" content="Открой меня">
+<style>
+  :root {
+    --neon: #ff5fa2;
+    --soft: #ffd1e6;
+    --dark: #0b0207;
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  canvas#fx {
+    position: fixed; inset: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    pointer-events: none;
+  }
+  .stage {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    width: 100%;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+  svg#bear {
+    width: min(84vw, 56vh, 460px);
+    height: auto;
+    overflow: visible;
+    filter: drop-shadow(0 0 3px rgba(255, 95, 162, 0.95))
+            drop-shadow(0 0 12px rgba(255, 45, 120, 0.55));
+  }
+  /* Линии «рисуются» сами: у каждой pathLength = 1 */
+  .line {
+    fill: var(--dark);
+    stroke: var(--neon);
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    fill-opacity: 0;
+    opacity: 0;
+    animation: draw var(--t, 1.1s) ease-in-out var(--d, 0s) forwards;
+  }
+  .line.thin { stroke-width: 3; }
+  .line.open { fill: none; }
+  /* Сначала контур, заливка — в конце: силуэт не проступает раньше линии */
+  @keyframes draw {
+    0%   { stroke-dashoffset: 1; opacity: 1; fill-opacity: 0; }
+    70%  { fill-opacity: 0; }
+    100% { stroke-dashoffset: 0; opacity: 1; fill-opacity: 1; }
+  }
+  /* Заливки проявляются после контура */
+  .pop {
+    opacity: 0;
+    animation: pop 0.7s ease-out var(--d, 0s) forwards;
+  }
+  @keyframes pop { to { opacity: 1; } }
+
+  /* Машет лапой — поворот вокруг плеча */
+  .wave {
+    transform-box: view-box;
+    transform-origin: 282px 300px;
+    animation: wave 1.7s ease-in-out 4.4s infinite;
+  }
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25%      { transform: rotate(16deg); }
+    60%      { transform: rotate(-10deg); }
+  }
+  /* Сердце бьётся двойным ударом, как в прошлом подарке */
+  .beat {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: beat 1.2s ease-in-out 4.6s infinite;
+  }
+  @keyframes beat {
+    0%, 45%, 100% { transform: scale(1); }
+    10% { transform: scale(1.13); }
+    20% { transform: scale(1); }
+    30% { transform: scale(1.08); }
+  }
+  .beat.big { animation: bigbeat 0.6s ease-out; }
+  @keyframes bigbeat {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  /* Моргает */
+  .blink {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: blink 4.6s ease-in-out 5.2s infinite;
+  }
+  @keyframes blink {
+    0%, 91%, 97%, 100% { transform: scaleY(1); }
+    94% { transform: scaleY(0.08); }
+  }
+  /* Румянец разгорается, когда её касаются */
+  .cheek { transition: fill 0.4s ease; }
+  .blush .cheek { fill: rgba(255, 70, 140, 0.85); }
+
+  #name, #msg, #hint {
+    text-align: center;
+    margin: 0;
+    color: #ffe6f1;
+    text-shadow: 0 0 6px rgba(255, 95, 162, 0.95), 0 0 18px rgba(255, 45, 120, 0.6);
+  }
+  #name {
+    min-height: 1.4em;
+    margin-top: 10px;
+    font: 500 clamp(15px, 4.2vw, 20px)/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.06em;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #name.show { opacity: 0.85; }
+  #msg {
+    min-height: 1.3em;
+    font: 700 clamp(26px, 8vw, 44px)/1.25 -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.02em;
+  }
+  #msg .cursor {
+    display: inline-block;
+    width: 0.08em; height: 0.9em;
+    margin-left: 0.06em;
+    vertical-align: -0.08em;
+    background: #ffe6f1;
+    animation: cursor 0.9s steps(1) infinite;
+  }
+  @keyframes cursor { 50% { opacity: 0; } }
+  #hint {
+    position: fixed; left: 0; right: 0;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    font: 500 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: 0.08em;
+    color: rgba(255, 170, 200, 0);
+    text-shadow: none;
+    transition: color 1.5s ease;
+    pointer-events: none;
+  }
+  #hint.show { color: rgba(255, 170, 200, 0.7); }
+
+  .words { display: flex; flex-direction: column; align-items: center; }
+  /* Телефон боком: мишка слева, текст справа — иначе не влезает по высоте */
+  @media (orientation: landscape) and (max-height: 520px) {
+    .stage { flex-direction: row; justify-content: center; gap: 28px; }
+    svg#bear { width: min(42vw, 70vh); }
+    .words { max-width: 46vw; }
+    #msg { font-size: clamp(22px, 7vh, 36px); }
+    #hint { left: 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .line { animation: none; stroke-dashoffset: 0; opacity: 1; fill-opacity: 1; }
+    .pop { animation: none; opacity: 1; }
+    .wave, .beat, .blink { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<main class="stage">
+  <svg id="bear" viewBox="0 0 400 520" role="img" aria-label="Мишка с сердцем">
+    <defs>
+      <radialGradient id="heartFill" cx="38%" cy="32%" r="75%">
+        <stop offset="0%" stop-color="#ffb3d3"/>
+        <stop offset="45%" stop-color="#ff3d80"/>
+        <stop offset="100%" stop-color="#b8003f"/>
+      </radialGradient>
+    </defs>
+    <g id="parts"></g>
+  </svg>
+  <div class="words">
+    <p id="name"></p>
+    <p id="msg"></p>
+  </div>
+</main>
+<div id="hint">коснись мишку ♡</div>
+<script>
+(() => {
+  // ——— Что написать. Меняется здесь или ссылкой: …/?name=Имя&msg=Текст ———
+  const MESSAGE = "Я тебя люблю";
+  const NAME = "";            // строка над посланием; пусто — не показывать
+
+  const params = new URLSearchParams(location.search);
+  const message = (params.get("msg") || MESSAGE).slice(0, 60);
+  const name = (params.get("name") || NAME).slice(0, 40);
+
+  const NS = "http://www.w3.org/2000/svg";
+  const parts = document.getElementById("parts");
+  const svg = document.getElementById("bear");
+
+  // Круг и эллипс — путями: у пути pathLength работает во всех браузерах
+  const circle = (cx, cy, r) =>
+    `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
+  const ellipse = (cx, cy, rx, ry) =>
+    `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 0 ${2 * rx} 0 a ${rx} ${ry} 0 1 0 ${-2 * rx} 0 Z`;
+  const HEART = "M 0 20 C -38 -5 -30 -38 -12 -38 C -4 -38 0 -31 0 -26 " +
+                "C 0 -31 4 -38 12 -38 C 30 -38 38 -5 0 20 Z";
+
+  function el(tag, attrs, parent) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    (parent || parts).appendChild(n);
+    return n;
+  }
+  // Контур, который рисуется: d — путь, d0 — задержка, t — длительность
+  function line(d, d0, t, extra = {}, parent) {
+    const cls = "line" + (extra.cls ? " " + extra.cls : "");
+    const n = el("path", { d, class: cls, pathLength: "1",
+      style: `--d:${d0}s;--t:${t}s`, ...(extra.transform ? { transform: extra.transform } : {}) }, parent);
+    if (extra.fill) n.style.fill = extra.fill;
+    return n;
+  }
+  function pop(d, d0, fill, extra = {}, parent) {
+    return el("path", { d, class: "pop" + (extra.cls ? " " + extra.cls : ""),
+      style: `--d:${d0}s`, fill, ...(extra.transform ? { transform: extra.transform } : {}) }, parent);
+  }
+
+  // Порядок — от заднего плана к переднему
+  // Уши
+  line(circle(118, 92, 40), 0.3, 1.0);
+  line(circle(282, 92, 40), 0.3, 1.0);
+  line(circle(122, 97, 21), 1.5, 0.7, { cls: "thin" });
+  line(circle(278, 97, 21), 1.5, 0.7, { cls: "thin" });
+  // Тело, животик, лапки
+  line(ellipse(200, 375, 105, 115), 0.6, 1.3);
+  line(ellipse(200, 398, 62, 70), 1.9, 0.9, { cls: "thin" });
+  line(ellipse(138, 478, 42, 28), 1.9, 0.8);
+  line(ellipse(262, 478, 42, 28), 1.9, 0.8);
+  for (const [x, y, r] of [[138, 484, 11], [124, 466, 5], [138, 462, 5], [152, 466, 5],
+                           [262, 484, 11], [248, 466, 5], [262, 462, 5], [276, 466, 5]]) {
+    pop(circle(x, y, r), 2.6, "rgba(255, 95, 162, 0.75)");
+  }
+  // Голова и мордочка
+  line(circle(200, 175, 100), 0.9, 1.3);
+  line(ellipse(200, 212, 44, 33), 1.6, 0.8, { cls: "thin" });
+  const cheeks = el("g", {});
+  pop(ellipse(142, 206, 17, 10), 2.8, "rgba(255, 70, 140, 0.45)", { cls: "cheek" }, cheeks);
+  pop(ellipse(258, 206, 17, 10), 2.8, "rgba(255, 70, 140, 0.45)", { cls: "cheek" }, cheeks);
+  pop("M 186 193 Q 200 183 214 193 Q 209 206 200 209 Q 191 206 186 193 Z", 2.6, "#ff7ab4");
+  line("M 200 209 Q 200 224 187 226", 2.7, 0.5, { cls: "thin open" });
+  line("M 200 209 Q 200 224 213 226", 2.7, 0.5, { cls: "thin open" });
+  const eyes = el("g", { class: "blink" });
+  // Тёмные глаза с белыми бликами — классический мультяшный взгляд
+  line(circle(160, 160, 11), 2.5, 0.5, { cls: "thin", fill: "#1a0510" }, eyes);
+  line(circle(240, 160, 11), 2.5, 0.5, { cls: "thin", fill: "#1a0510" }, eyes);
+  pop(circle(156, 155.5, 3.6), 2.9, "#fff", {}, eyes);
+  pop(circle(236, 155.5, 3.6), 2.9, "#fff", {}, eyes);
+  pop(circle(163.5, 164, 1.7), 2.9, "#fff", {}, eyes);
+  pop(circle(243.5, 164, 1.7), 2.9, "#fff", {}, eyes);
+  // Левая лапа держит сердце
+  line(ellipse(140, 338, 26, 47), 2.3, 0.9, { transform: "rotate(-34 140 338)" });
+  const heart = el("g", { class: "beat" });
+  line(HEART, 3.2, 0.9, { fill: "none" }, heart).setAttribute("transform", "translate(206 390) scale(1.05)");
+  pop(HEART, 3.9, "url(#heartFill)", { transform: "translate(206 390) scale(1.05)" }, heart);
+  line(circle(166, 380, 17), 3.6, 0.6);
+  // Правая лапа машет
+  const arm = el("g", { class: "wave" });
+  line(ellipse(313, 252, 26, 57), 2.3, 0.9, { transform: "rotate(34 313 252)" }, arm);
+  pop(circle(344, 206, 9), 3.0, "rgba(255, 95, 162, 0.75)", {}, arm);
+
+  // ——— Надпись: печатается после рисунка ———
+  const nameEl = document.getElementById("name");
+  const msgEl = document.getElementById("msg");
+  const hint = document.getElementById("hint");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (name) { nameEl.textContent = name; }
+  const cursor = document.createElement("span");
+  cursor.className = "cursor";
+  function type(i) {
+    msgEl.textContent = message.slice(0, i);
+    msgEl.appendChild(cursor);
+    if (i < message.length) setTimeout(() => type(i + 1), 110);
+    else setTimeout(() => hint.classList.add("show"), 600);
+  }
+  setTimeout(() => {
+    if (name) nameEl.classList.add("show");
+    if (reduce) { msgEl.textContent = message; hint.classList.add("show"); }
+    else type(0);
+  }, reduce ? 0 : 4600);
+
+  // ——— Фон: поднимаются сердечки; касание — россыпь ———
+  const canvas = document.getElementById("fx");
+  const ctx = canvas.getContext("2d");
+  let W = 0, H = 0, DPR = 1;
+  let floaters = [], sparks = [];
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const n = Math.round(Math.min(34, (W * H) / 22000));
+    floaters = Array.from({ length: n }, () => newFloater(true));
+  }
+  function newFloater(anywhere) {
+    return {
+      x: Math.random() * W,
+      y: anywhere ? Math.random() * H : H + 20,
+      vy: 0.15 + Math.random() * 0.35,
+      sway: Math.random() * Math.PI * 2,
+      size: 8 + Math.random() * 14,
+      alpha: 0.08 + Math.random() * 0.22,
+    };
+  }
+  function burst(x, y, count = 26) {
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 4;
+      sparks.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2,
+                    life: 1, size: 10 + Math.random() * 16 });
+    }
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last) * 0.06;
+    last = now;
+    ctx.clearRect(0, 0, W, H);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (const f of floaters) {
+      f.y -= f.vy * dt;
+      f.sway += 0.02 * dt;
+      if (f.y < -20) Object.assign(f, newFloater(false));
+      ctx.font = `${f.size}px sans-serif`;
+      ctx.fillStyle = `rgba(255, 95, 162, ${f.alpha})`;
+      ctx.fillText("♥", f.x + Math.sin(f.sway) * 12, f.y);
+    }
+    for (const s of sparks) {
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.vy += 0.08 * dt; s.life -= 0.012 * dt;
+      ctx.font = `${s.size}px sans-serif`;
+      ctx.fillStyle = `rgba(255, 90, 140, ${Math.max(0, s.life)})`;
+      ctx.fillText("♥", s.x, s.y);
+    }
+    sparks = sparks.filter((s) => s.life > 0);
+    if (!reduce) requestAnimationFrame(frame);
+  }
+
+  // Касание мишки — он краснеет, сердце бьётся сильнее, сердечки из сердца
+  window.addEventListener("pointerdown", (e) => {
+    const box = svg.getBoundingClientRect();
+    const inBear = e.clientX >= box.left && e.clientX <= box.right &&
+                   e.clientY >= box.top && e.clientY <= box.bottom;
+    if (inBear) {
+      const k = box.width / 400;
+      burst(box.left + 206 * k, box.top + 378 * k, 34);
+      svg.classList.add("blush");
+      heart.classList.remove("big");
+      void heart.getBoundingClientRect();
+      heart.classList.add("big");
+      clearTimeout(window.__blush);
+      window.__blush = setTimeout(() => {
+        svg.classList.remove("blush");
+        heart.classList.remove("big");
+      }, 1400);
+    } else {
+      burst(e.clientX, e.clientY);
+    }
+    if (reduce) requestAnimationFrame(frame);
+  });
+  window.addEventListener("resize", resize);
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
