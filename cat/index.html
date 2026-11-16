@@ -117,38 +117,10 @@
     100% { opacity: 0; transform: scale(1.5); }
   }
 
-  #name, #msg, #hint {
-    text-align: center;
-    margin: 0;
-    color: #ffe6f1;
-    text-shadow: 0 0 6px rgba(255, 95, 162, 0.95), 0 0 18px rgba(255, 45, 120, 0.6);
-  }
-  #name {
-    min-height: 1.4em;
-    margin-top: 8px;
-    font: 500 clamp(15px, 4.2vw, 20px)/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.06em;
-    opacity: 0;
-    transition: opacity 1.2s ease;
-  }
-  #name.show { opacity: 0.85; }
-  #msg {
-    min-height: 1.3em;
-    font: 700 clamp(26px, 8vw, 44px)/1.25 -apple-system, "Segoe UI", Roboto, sans-serif;
-    letter-spacing: 0.02em;
-  }
-  #msg .cursor {
-    display: inline-block;
-    width: 0.08em; height: 0.9em;
-    margin-left: 0.06em;
-    vertical-align: -0.08em;
-    background: #ffe6f1;
-    animation: cursor 0.9s steps(1) infinite;
-  }
-  @keyframes cursor { 50% { opacity: 0; } }
   #hint {
     position: fixed; left: 0; right: 0;
     bottom: max(20px, env(safe-area-inset-bottom));
+    text-align: center;
     font: 500 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif;
     letter-spacing: 0.08em;
     color: rgba(255, 170, 200, 0);
@@ -158,12 +130,8 @@
   }
   #hint.show { color: rgba(255, 170, 200, 0.7); }
 
-  .words { display: flex; flex-direction: column; align-items: center; }
   @media (orientation: landscape) and (max-height: 520px) {
-    .stage { flex-direction: row; justify-content: center; gap: 28px; }
-    svg#scene { width: min(40vw, 82vh); }
-    .words { max-width: 46vw; }
-    #msg { font-size: clamp(22px, 7vh, 36px); }
+    svg#scene { width: min(46vw, 86vh); }
     #hint { left: 50%; }
   }
 
@@ -251,26 +219,12 @@
       </g>
     </g>
   </svg>
-  <div class="words">
-    <p id="name"></p>
-    <p id="msg"></p>
-  </div>
 </main>
 <div id="hint">коснись ♡</div>
 <script>
 (() => {
-  // ——— Что написать в финале: меняется здесь или …/?msg=Текст&name=Имя ———
-  const MESSAGE = "Для тебя ♥";
-  const NAME = "";
-
-  const params = new URLSearchParams(location.search);
-  const message = (params.get("msg") || MESSAGE).slice(0, 60);
-  const name = (params.get("name") || NAME).slice(0, 40);
-
   const svg = document.getElementById("scene");
   const hint = document.getElementById("hint");
-  const nameEl = document.getElementById("name");
-  const msgEl = document.getElementById("msg");
   const purr = document.getElementById("purr");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -426,17 +380,6 @@
       const n = Math.round(Math.min(34, (W * H) / 22000));
       floaters = Array.from({ length: n }, () => newFloater(true));
     }, reduce ? 0 : 900);
-    if (name) { nameEl.textContent = name; setTimeout(() => nameEl.classList.add("show"), 1400); }
-    const cursor = document.createElement("span");
-    cursor.className = "cursor";
-    function type(i) {
-      msgEl.textContent = message.slice(0, i);
-      msgEl.appendChild(cursor);
-      if (i < message.length) setTimeout(() => type(i + 1), 110);
-    }
-    setTimeout(() => {
-      if (reduce) msgEl.textContent = message; else type(0);
-    }, reduce ? 0 : 1600);
   }
 
   // Касание: до финала — следующий кусочек; после — кот мурчит или искры
